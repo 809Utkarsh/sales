@@ -1,254 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MongoDB Express App</title>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f4f4f4;
-        }
-
-        h1, h2 {
-            color: #333;
-        }
-
-        form {
-            background-color: #fff;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
-
-        input {
-            display: block;
-            width: calc(100% - 22px);
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 3px;
-            border: 1px solid #ccc;
-        }
-
-        button {
-            padding: 10px 20px;
-            margin-top: 10px;
-            border: none;
-            border-radius: 3px;
-            background-color: #007BFF;
-            color: white;
-            cursor: pointer;
-        }
-
-        button:hover {
-            background-color: #0056b3;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-
-        th, td {
-            padding: 10px;
-            border: 1px solid #ccc;
-            text-align: left;
-        }
-
-        th {
-            background-color: #f2f2f2;
-        }
-
-        .edit-button {
-            background-color: #28a745;
-            margin-left: 10px;
-        }
-
-        .edit-button:hover {
-            background-color: #218838;
-        }
-
-        #edit-form {
-            background-color: #fff;
-            padding: 20px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        }
+        /* Your existing CSS styles */
     </style>
     <script>
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const day = String(date.getUTCDate()).padStart(2, '0');
-            const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-based
-            const year = date.getUTCFullYear();
-            return `${month}/${day}/${year}`;
-        }
+        async function fetchSellers() {
+            try {
+                const response = await fetch('/sellers');
+                const sellers = await response.json();
+                const sellersTableBody = document.getElementById('sellers-table-body');
+                sellersTableBody.innerHTML = '';
 
-        async function fetchRecords() {
-            const response = await fetch('/records');
-            const records = await response.json();
-            const recordsTableBody = document.getElementById('records-table-body');
-            recordsTableBody.innerHTML = '';
-            records.forEach(record => {
-                const row = document.createElement('tr');
+                sellers.forEach(seller => {
+                    seller.products.forEach(product => {
+                        const row = document.createElement('tr');
 
-                // List of fields to be displayed
-                const fields = [
-                    'companyId', 'companyName', 'nbfcId', 'nbfcName', 'loanType', 
-                    'status', 'loanId', 'disbAmount', 'txnId', 'disbDate', 
-                    'collAmount', 'collDate', 'collAmount1', 'collDate1', 
-                    'collAmount2', 'collDate2'
-                ];
+                        const fields = [
+                            'seller_id', 'seller_name',
+                            'product', 'brand',
+                            'quantity', 'buying_price', 'selling_price', 
+                            'buying_date', 'status',
+                            'specifications.screen_size', 'specifications.battery', 
+                            'specifications.camera', 'specifications.processor',
+                            'sales.quantity_sold', 'sales.selling_price', 
+                            'sales.selling_date', 'sales.status', 
+                            'sales.returned', 'sales.return_dates'
+                        ];
 
-                fields.forEach(field => {
-                    const td = document.createElement('td');
-                    const value = (field.includes('Date')) ? formatDate(record[field]) : record[field];
-                    td.textContent = value;
-                    row.appendChild(td);
+                        fields.forEach(field => {
+                            const td = document.createElement('td');
+                            const keys = field.split('.');
+                            let value = product;
+                            keys.forEach(key => value = value[key] || '');
+                            td.textContent = Array.isArray(value) ? value.join(', ') : value;
+                            row.appendChild(td);
+                        });
+
+                        sellersTableBody.appendChild(row);
+                    });
                 });
-
-                // Add edit button
-                const td = document.createElement('td');
-                const editButton = document.createElement('button');
-                editButton.textContent = 'Edit';
-                editButton.className = 'edit-button';
-                editButton.onclick = () => showEditForm(record);
-                td.appendChild(editButton);
-                row.appendChild(td);
-
-                recordsTableBody.appendChild(row);
-            });
-        }
-
-        async function addRecord(event) {
-            event.preventDefault();
-            const formData = new FormData(event.target);
-            const record = Object.fromEntries(formData.entries());
-            await fetch('/records', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(record)
-            });
-            fetchRecords();
-        }
-
-        async function editRecord(event, id) {
-            event.preventDefault();
-            const formData = new FormData(event.target);
-            const record = Object.fromEntries(formData.entries());
-            await fetch(`/records/${id}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(record)
-            });
-            fetchRecords();
-            closeEditForm();
-        }
-
-        function showEditForm(record) {
-            const editForm = document.getElementById('edit-form');
-            Object.keys(record).forEach(key => {
-                const input = editForm.querySelector(`[name="${key}"]`);
-                if (input) {
-                    input.value = record[key];
-                }
-            });
-            editForm.onsubmit = (event) => editRecord(event, record._id);
-            editForm.style.display = 'block';
-        }
-
-        function closeEditForm() {
-            const editForm = document.getElementById('edit-form');
-            editForm.style.display = 'none';
+            } catch (error) {
+                console.error('Error fetching sellers:', error);
+            }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetchRecords();
+            fetchSellers();
         });
     </script>
 </head>
-
 <body>
     <h1>MongoDB Express App</h1>
-    <h2>Records</h2>
+    <h2>Sellers</h2>
     <table>
         <thead>
             <tr>
-                <th>Company ID</th>
-                <th>Company Name</th>
-                <th>NBFC ID</th>
-                <th>NBFC Name</th>
-                <th>Loan Type</th>
+                <th>Seller ID</th>
+                <th>Seller Name</th>
+                <th>Product</th>
+                <th>Brand</th>
+                <th>Quantity</th>
+                <th>Buying Price</th>
+                <th>Selling Price</th>
+                <th>Buying Date</th>
                 <th>Status</th>
-                <th>Loan ID</th>
-                <th>DISB Amount</th>
-                <th>TXN ID</th>
-                <th>DISB Date</th>
-                <th>COLL Amount</th>
-                <th>COLL Date</th>
-                <th>COLL Amount 1</th>
-                <th>COLL Date 1</th>
-                <th>COLL Amount 2</th>
-                <th>COLL Date 2</th>
-                <th>Actions</th>
+                <th>Screen Size</th>
+                <th>Battery</th>
+                <th>Camera</th>
+                <th>Processor</th>
+                <th>Quantity Sold</th>
+                <th>Selling Price (Sales)</th>
+                <th>Selling Date</th>
+                <th>Status (Sales)</th>
+                <th>Returned</th>
+                <th>Return Dates</th>
             </tr>
         </thead>
-        <tbody id="records-table-body">
-            <!-- Records will be populated here -->
+        <tbody id="sellers-table-body">
+            <!-- Sellers will be populated dynamically -->
         </tbody>
     </table>
-
-    <h2>Add Record</h2>
-    <form onsubmit="addRecord(event)">
-        <input name="companyId" placeholder="Company ID" required />
-        <input name="companyName" placeholder="Company Name" required />
-        <input name="nbfcId" placeholder="NBFC ID" required />
-        <input name="nbfcName" placeholder="NBFC Name" required />
-        <input name="loanType" placeholder="Loan Type" required />
-        <input name="status" placeholder="Status" required />
-        <input name="loanId" placeholder="Loan ID" required />
-        <input name="disbAmount" placeholder="DISB Amount" required />
-        <input name="txnId" placeholder="TXN ID" required />
-        <input name="disbDate" placeholder="DISB Date" required />
-        <input name="collAmount" placeholder="COLL Amount" required />
-        <input name="collDate" placeholder="COLL Date" required />
-        <input name="collAmount1" placeholder="COLL Amount 1" />
-        <input name="collDate1" placeholder="COLL Date 1" />
-        <input name="collAmount2" placeholder="COLL Amount 2" />
-        <input name="collDate2" placeholder="COLL Date 2" />
-        <button type="submit">Add Record</button>
-    </form>
-
-    <h2>Edit Record</h2>
-    <form id="edit-form" style="display:none;" onsubmit="">
-        <input name="companyId" placeholder="Company ID" required />
-        <input name="companyName" placeholder="Company Name" required />
-        <input name="nbfcId" placeholder="NBFC ID" required />
-        <input name="nbfcName" placeholder="NBFC Name" required />
-        <input name="loanType" placeholder="Loan Type" required />
-        <input name="status" placeholder="Status" required />
-        <input name="loanId" placeholder="Loan ID" required />
-        <input name="disbAmount" placeholder="DISB Amount" required />
-        <input name="txnId" placeholder="TXN ID" required />
-        <input name="disbDate" placeholder="DISB Date" required />
-        <input name="collAmount" placeholder="COLL Amount" required />
-        <input name="collDate" placeholder="COLL Date" required />
-        <input name="collAmount1" placeholder="COLL Amount 1" />
-        <input name="collDate1" placeholder="COLL Date 1" />
-        <input name="collAmount2" placeholder="COLL Amount 2" />
-        <input name="collDate2" placeholder="COLL Date 2" />
-        <button type="submit">Save Changes</button>
-        <button type="button" onclick="closeEditForm()">Cancel</button>
-    </form>
 </body>
-
 </html>

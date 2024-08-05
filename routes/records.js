@@ -1,37 +1,78 @@
 const express = require('express');
-const Record = require('../models/Record');
-const router = express.Router();
+const mongoose = require('mongoose');
+const multer = require('multer');
+const xlsx = require('xlsx');
+const fs = require('fs');
+const path = require('path');
+const Seller = require('./models/record');
 
-router.get('/', async(req, res) => {
+const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, 'public'))); // serve static files
+
+mongoose.connect('mongodb://localhost:27017/sellerdb', { useNewUrlParser: true, useUnifiedTopology: true });
+
+const upload = multer({ dest: 'uploads/' });
+
+const transformExcelData = (data) => {
+    return data.map(item => ({
+        sellerId: item['Seller Id'],
+        sellerName: item['Seller Name'],
+        product: item['Product'],
+        brand: item['Brand'],
+        quantity: item['Quantity'],
+        buyingPrice: item['Buying Price'],
+        buyingDate: new Date(item['Buying Date']),
+        sellingPrice: item['Selling Price'],
+        status: item['Status']
+    }));
+};
+
+app.post('/upload', upload.single('file'), async (req, res) => {
     try {
-        const records = await Record.find();
-        res.json(records);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
+        const file = req.file;
+        if (!file) {
+            return res.status(400).send('No file uploaded.');
+        }
+
+        const workbook = xlsx.readFile(file.path);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const jsonData = xlsx.utils.sheet_to_json(worksheet);
+
+        // Transform jsonData to match the Seller schema
+        const transformedData = transformExcelData(jsonData);
+
+        await Seller.insertMany(transformedData);
+        fs.unlinkSync(file.path); // Remove the file after processing
+        res.status(200).send('File uploaded and data inserted successfully.');
+    } catch (error) {
+        console.error('Error processing upload:', error);
+        res.status(500).send('Error processing file.');
     }
 });
 
-router.post('/', async(req, res) => {
-    const record = new Record(req.body);
+app.post('/add-data', async (req, res) => {
     try {
-        const newRecord = await record.save();
-        res.status(201).json(newRecord);
-    } catch (err) {
-        res.status(400).json({ message: err.message });
+        const data = req.body;
+        await Seller.insertMany(data);
+        res.status(200).send('Data inserted successfully.');
+    } catch (error) {
+        console.error('Error inserting data:', error);
+        res.status(500).send('Error inserting data.');
     }
 });
 
-router.put('/:id', async(req, res) => {
+app.get('/sellers', async (req, res) => {
     try {
-        const record = await Record.findById(req.params.id);
-        if (!record) return res.status(404).json({ message: 'Record not found' });
-
-        Object.assign(record, req.body);
-        await record.save();
-        res.json(record);
-    } catch (err) {
-        res.status(400).json({ message: err.message });
+        const sellers = await Seller.find();
+        res.json(sellers);
+    } catch (error) {
+        res.status(500).send('Server error.');
     }
 });
 
-module.exports = router;
+app.listen(3000, () => {
+    console.log('Server started on port 3000');
+});
